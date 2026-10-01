@@ -79,10 +79,10 @@ pip install -r requirements.txt
 
 All steps run on the **MPS** device (Apple silicon GPU) automatically — no config change needed.
 
-### Step 1 — Prepare training data
+### Step 1 — Prepare training data ✅
 
-Drops any training SR whose objective is a near-copy of a test SR objective, then
-shows the include / exclude mix at each stage and plots it to `plots/mix_train.png`.
+Drops any training SR whose SR PMID appears in the test set, then shows the
+include / exclude mix at each stage and plots it to `plots/mix_train.png`.
 
 ```bash
 python prepare_data.py \
@@ -94,7 +94,12 @@ python prepare_data.py \
 `train.py` will refuse to start if the mix is off the design; fix it by re-running with
 the default `--mix balanced` flag (already the default).
 
-### Step 2 — Train (~85 min on M4 Pro)
+> **Done** — `data/train_all.jsonl` written (5 751 rows, 0 test copies dropped).
+
+### Step 2 — Train (~2–3 h on M4) ⏳
+
+> **Not started.** `MICRO_BATCH` reduced from 8 → 4 (`GRAD_ACCUM` 8 → 16) to fit
+> in 20 GB MPS memory; effective batch size unchanged at 64.
 
 ```bash
 python train.py \
@@ -107,7 +112,7 @@ Before the first gradient step `train.py` prints and plots the mix it will train
 (`runs/screening_v1/mix.png`) and aborts on a skewed one.  Pass `--allow-skew` to
 override, or `--max-steps 25` for a quick smoke-test that saves nothing.
 
-### Step 3 — Evaluate
+### Step 3 — Evaluate ⏳
 
 ```bash
 python evaluate.py base                # zero-shot baseline
@@ -132,6 +137,26 @@ keeping an irrelevant one.
 Python venv adds ~200–400 MB depending on whether PyTorch was already cached.
 Allow **3 GB free** to be comfortable.
 
+## HuggingFace token
+
+Setting a HuggingFace token speeds up model downloads (higher rate limits, gated
+model access) and avoids throttling on the ~840 MB Laya checkpoint.
+
+1. Create a read token at <https://huggingface.co/settings/tokens>.
+2. Add it to your `.env`:
+
+```
+HF_TOKEN=hf_...
+```
+
+`train.py` and `evaluate.py` pick it up automatically via the `huggingface_hub`
+library.  Alternatively, log in once with the CLI — the token is then stored in
+`~/.cache/huggingface/token` and does not need to be in `.env`:
+
+```bash
+huggingface-cli login
+```
+
 ## Database access
 
 `build_dataset.py` and `generate_dataset.py` require a connection to the Postgres
@@ -141,6 +166,7 @@ without any database access — e.g. from an office machine where the database i
 not reachable.
 
 ```
+HF_TOKEN=hf_...
 PG_HOST=
 PG_PORT=
 PG_USER=

@@ -12,38 +12,20 @@ Two stages, each shown in the table and the plot so a skew is caught before trai
 import argparse
 import collections
 import copy
-import difflib
 import json
-import re
 from pathlib import Path
 from typing import Any
 
 from finetune_data import DESIGN_CLEAN_SHARE, TEST_SET, read_jsonl
 
-NEAR_TEST = 0.8  # SR-objective similarity at which a training row counts as a test copy
-
-
-def normalise(text: str) -> str:
-    return re.sub(r"[^a-z0-9 ]", "", text.lower()).strip()
-
-
-def _test_questions() -> list[str]:
-    return [normalise(r["question"]) for r in read_jsonl(TEST_SET)]
-
-
-def is_near(question: str, tests: list[str], cutoff: float = NEAR_TEST) -> bool:
-    q = normalise(question)
-    for t in tests:
-        sm = difflib.SequenceMatcher(None, q, t)
-        if sm.real_quick_ratio() >= cutoff and sm.quick_ratio() >= cutoff and sm.ratio() >= cutoff:
-            return True
-    return False
+def _test_sr_pmids() -> set[str]:
+    return {r["sr_pmid"] for r in read_jsonl(TEST_SET)}
 
 
 def drop_test_copies(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """(kept, dropped). Removes rows whose SR objective is a near-copy of a test SR objective."""
-    tests = _test_questions()
-    near = [is_near(r["question"], tests) for r in rows]
+    """(kept, dropped). Removes rows whose SR is in the test set (matched by sr_pmid)."""
+    test_pmids = _test_sr_pmids()
+    near = [r["sr_pmid"] in test_pmids for r in rows]
     return [r for r, n in zip(rows, near) if not n], [r for r, n in zip(rows, near) if n]
 
 

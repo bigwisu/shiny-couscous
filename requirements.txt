@@ -6,5 +6,5 @@ transformers==5.17.0
 safetensors==0.8.0
 huggingface-hub==1.32.0
 matplotlib==3.11.2
-psycopg2-binary==2.9.10
+psycopg2-binary>=2.9.13
 python-dotenv==1.1.1

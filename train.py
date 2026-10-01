@@ -27,7 +27,7 @@ from mix_report import preflight
 from finetune_data import base_checkpoint, questions, read_jsonl, to_items
 from prepare_data import weight_to_design
 
-MICRO_BATCH, GRAD_ACCUM, GROUP_SIZE = 8, 8, 4   # 8 x 8 = the notebook's 64 per update
+MICRO_BATCH, GRAD_ACCUM, GROUP_SIZE = 4, 16, 4  # 4 x 16 = the notebook's 64 per update
 LR_ENCODER, LR_HEAD = 2.5e-5, 1.0e-4
 SIGMA_START, SIGMA_END = 0.4, 0.1
 CALIB_SHARE, SEED = 0.1, 20260924
@@ -113,7 +113,7 @@ def main() -> None:
     ap.add_argument("--train", required=True, help="prepared file from prepare_data.py")
     ap.add_argument("--rows", type=int, default=None, help="use only the first N rows")
     ap.add_argument("--mix", choices=("none", "balanced"), default="balanced",
-                    help="balanced: weight include/exclude to the corpus design (~16.4% include)")
+                    help="balanced: weight include/exclude to the corpus design (~16.4%% include)")
     ap.add_argument("--allow-skew", action="store_true",
                     help="train even if the mix is off the design")
     ap.add_argument("--seed", type=int, default=SEED)
