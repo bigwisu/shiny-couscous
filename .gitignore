@@ -1,0 +1,26 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment and secrets
+.env
+*.env.local
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Output files
+outputs/*.csv
+outputs/*.json
+
+# OS and IDE files
+.DS_Store
+.vscode/
+.idea/
