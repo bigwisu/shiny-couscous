@@ -1,5 +1,4 @@
 laya==0.3.5
-laya-mlx==0.2.0
 numpy==2.5.3
 torch==2.14.0
 transformers==5.17.0

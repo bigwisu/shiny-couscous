@@ -31,7 +31,7 @@ MICRO_BATCH, GRAD_ACCUM, GROUP_SIZE = 4, 16, 4  # 4 x 16 = the notebook's 64 per
 LR_ENCODER, LR_HEAD = 2.5e-5, 1.0e-4
 SIGMA_START, SIGMA_END = 0.4, 0.1
 CALIB_SHARE, SEED = 0.1, 20260924
-DEVICE = torch.device("mps")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
 
 
 def load_model(model_dir: str):
@@ -43,7 +43,7 @@ def load_model(model_dir: str):
 
 def forward(model, batch):
     keys = ("input_ids", "attention_mask", "marker_pos", "marker_mask", "qtype")
-    with torch.autocast("mps", dtype=torch.bfloat16):
+    with torch.autocast(DEVICE.type, dtype=torch.bfloat16):
         logits, act = model(*(batch[k].to(DEVICE) for k in keys))
     return logits.float(), act
 
