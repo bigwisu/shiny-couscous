@@ -24,3 +24,7 @@ outputs/*.json
 .DS_Store
 .vscode/
 .idea/
+
+# Model artifacts — transfer via scp, publish via HF
+runs/
+plots/
