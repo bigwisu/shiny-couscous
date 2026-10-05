@@ -46,9 +46,19 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+# v3: soft label constants — prevent logit saturation on true inclusions
+SOFT_INCLUDE_TARGET = 0.90   # confidence ceiling for inclusions  (was 1.0)
+SOFT_EXCLUDE_FLOOR  = 0.10   # residual uncertainty for inclusions (was 0.0)
+
+
 def to_items(rows: list[dict[str, Any]], qs: dict[str, dict[str, Any]], tok, cfg,
              _reference: str = "planted") -> list[dict[str, Any]]:
-    """One training sequence per row, dropping any whose markers were cut."""
+    """One training sequence per row, dropping any whose markers were cut.
+
+    v3: true-inclusion targets are soft ([0.90, 0.10]) so the model can express
+    calibrated intermediate probabilities on borderline evidence instead of being
+    driven to logit saturation at P=0 / P=1.  Exclusion targets remain hard [0.0, 1.0].
+    """
     from laya.common import QTYPES, build_sequence, render_options
     items = []
     for row in rows:
@@ -60,7 +70,11 @@ def to_items(rows: list[dict[str, Any]], qs: dict[str, dict[str, Any]], tok, cfg
             if len(markers) != len(render_options(internal)):
                 continue
             label = keys.index(labels(row)["verdict"])
-            target = [1.0 if i == label else 0.0 for i in range(len(keys))]
+            if label == 0:  # include → soft target
+                target = [SOFT_INCLUDE_TARGET if i == label else SOFT_EXCLUDE_FLOOR
+                          for i in range(len(keys))]
+            else:           # exclude → hard target (already correct; keep gradient sharp)
+                target = [1.0 if i == label else 0.0 for i in range(len(keys))]
             items.append({"ids": ids, "markers": markers, "qtype": QTYPES[q["type"]], "target": target,
                           "label": label, "question": name, "weight": row.get("weight", 1.0)})
     return items

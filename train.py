@@ -22,13 +22,13 @@ from safetensors.torch import load_file, save_file
 from transformers import AutoTokenizer
 from laya.common import build_model, collate_items, proper_reward
 
-from calibrate import fit_temperatures
+from calibrate import fit_temperatures_v3 as fit_temperatures
 from mix_report import preflight
 from finetune_data import base_checkpoint, questions, read_jsonl, to_items
 from prepare_data import weight_to_design
 
 MICRO_BATCH, GRAD_ACCUM, GROUP_SIZE = 4, 16, 4  # 4 x 16 = the notebook's 64 per update
-LR_ENCODER, LR_HEAD = 2.5e-5, 1.0e-4
+LR_ENCODER, LR_HEAD = 8.0e-6, 1.0e-4  # v3: conservative encoder LR to preserve foundation semantics
 SIGMA_START, SIGMA_END = 0.4, 0.1
 CALIB_SHARE, SEED = 0.1, 20260924
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps")
@@ -49,7 +49,12 @@ def forward(model, batch):
 
 
 def loss_on(model, batch, sigma: float):
-    """RLCD with asymmetric false-negative penalty (5.0x for positive includes)."""
+    """Dual asymmetric RLCD + CE with 10x false-negative penalty (v3).
+
+    Both the RLCD policy-gradient advantage and the CE supervised term are weighted
+    by pos_weight so false negatives are penalised 10x in both learning signals.
+    target[:, 0] == 1.0 identifies true inclusions (label 0 = 'include').
+    """
     logits, act = forward(model, batch)
     mask, target = batch["marker_mask"].to(DEVICE), batch["target"].to(DEVICE)
     k = mask.sum(-1, keepdim=True).float()
@@ -61,14 +66,18 @@ def loss_on(model, batch, sigma: float):
         r = proper_reward(q, target.unsqueeze(0), batch["qtype"].to(DEVICE), mask, w_sph=0.75, w_rps=1.0)
         adv = (r - r.mean(0, keepdim=True)) / ((r - r.mean(0, keepdim=True)).std() + 1e-6)
     logp = -(((z - logits.unsqueeze(0)) ** 2) * mask).sum(-1) / (2 * sigma**2)
-    
-    # Asymmetric class penalty: target[:, 0] is 'include' (label 0 in SCREENING_OPTIONS)
-    # Weight includes 5.0x to prevent majority-class collapse
-    pos_weight = torch.where(target[:, 0] == 1.0, 5.0, 1.0).to(DEVICE)
+
+    # v3: 10x asymmetric penalty on inclusions — applied to BOTH loss terms (dual asymmetric)
+    # target[:, 0] is the 'include' logit slot (first entry in SCREENING_OPTIONS)
+    # Use target.max(-1).values > 0.5 to detect inclusions regardless of soft-label smoothing
+    is_include = (target[:, 0] > 0.5).float()
+    pos_weight = 1.0 + 9.0 * is_include  # 10.0 for includes, 1.0 for excludes
+
     ce = -(target * torch.log_softmax(logits.masked_fill(~mask, -1e4), -1)).sum(-1) * pos_weight
-    
+
     w = torch.tensor([m["weight"] for m in batch["meta"]], device=DEVICE)
-    loss_rl = -((adv * logp).mean(0) * w).sum() / w.sum()
+    # Apply pos_weight to the RLCD advantage signal as well (dual asymmetric)
+    loss_rl = -((adv * logp * pos_weight.unsqueeze(0)).mean(0) * w).sum() / w.sum()
     return loss_rl + (ce * w).sum() / w.sum() + 0.0 * act.sum()
 
 
@@ -167,7 +176,8 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=SEED)
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--max-steps", type=int, default=None)
-    ap.add_argument("--out", default=None)
+    ap.add_argument("--out", default=None,
+                    help="output directory; e.g. runs/soces-pubmed-v3")
     args = ap.parse_args()
 
     rows = read_jsonl(Path(args.train))[: args.rows]
