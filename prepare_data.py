@@ -29,20 +29,21 @@ def drop_test_copies(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
     return [r for r, n in zip(rows, near) if not n], [r for r, n in zip(rows, near) if n]
 
 
-def weight_to_design(rows: list[dict[str, Any]], clean_share: float = DESIGN_CLEAN_SHARE,
+def weight_to_design(rows: list[dict[str, Any]], clean_share: float = 0.50,
                      balance_types: bool = False) -> None:
-    """Weight rows so 'include' has clean_share of total weight.
+    """Weight rows so 'include' has 50% (clean_share) of total gradient weight.
 
-    balance_types is accepted for API compatibility but is a no-op for the binary task —
-    there is only one non-include class.
+    Prevents majority-class collapse in highly imbalanced citation screening corpora.
     """
     n = len(rows)
     counts = collections.Counter(r["planted"] for r in rows)
+    pos_count = max(1, counts.get("none", 0))
+    neg_count = max(1, n - pos_count)
     for r in rows:
         if r["planted"] == "none":
-            r["weight"] = clean_share / (counts["none"] / n)
+            r["weight"] = clean_share / (pos_count / n)
         else:
-            r["weight"] = (1 - clean_share) / ((n - counts["none"]) / n)
+            r["weight"] = (1.0 - clean_share) / (neg_count / n)
 
 
 def weighted(rows: list[dict[str, Any]], mix: str) -> list[dict[str, Any]]:

@@ -72,6 +72,48 @@ def loss_on(model, batch, sigma: float):
     return loss_rl + (ce * w).sum() / w.sum() + 0.0 * act.sum()
 
 
+def build_balanced_batches(items: list[dict], micro_batch_size: int, rng: random.Random) -> list[list[dict]]:
+    """Build micro-batches with at least 1 positive 'include' example per batch."""
+    pos = [it for it in items if it["label"] == 0]
+    neg = [it for it in items if it["label"] != 0]
+    rng.shuffle(pos)
+    rng.shuffle(neg)
+
+    batches = []
+    n_batches = len(items) // micro_batch_size
+    pos_idx, neg_idx = 0, 0
+    
+    for _ in range(n_batches):
+        batch = []
+        # Add 1 or 2 positive includes if available
+        n_pos = min(2, len(pos) - pos_idx)
+        if n_pos > 0:
+            batch.extend(pos[pos_idx : pos_idx + n_pos])
+            pos_idx += n_pos
+        else:
+            # Wrap around positives to prevent batches with 0 positive signal
+            rng.shuffle(pos)
+            pos_idx = 0
+            batch.extend(pos[:1])
+            pos_idx = 1
+        
+        # Fill remainder with negatives
+        needed = micro_batch_size - len(batch)
+        if needed > 0 and neg_idx < len(neg):
+            batch.extend(neg[neg_idx : neg_idx + needed])
+            neg_idx += needed
+        elif needed > 0:
+            rng.shuffle(neg)
+            neg_idx = 0
+            batch.extend(neg[:needed])
+            neg_idx = needed
+        
+        rng.shuffle(batch)
+        batches.append(batch)
+        
+    return batches
+
+
 def train(model, items, pad_id: int, epochs: int, max_steps: int | None, seed: int) -> None:
     enc = [p for n, p in model.named_parameters() if n.startswith("encoder.")]
     head = [p for n, p in model.named_parameters() if not n.startswith("encoder.")]
@@ -83,12 +125,13 @@ def train(model, items, pad_id: int, epochs: int, max_steps: int | None, seed: i
     step, t0 = 0, time.time()
     for epoch in range(epochs):
         sigma = SIGMA_START + (SIGMA_END - SIGMA_START) * epoch / max(1, epochs - 1)
-        random.Random(seed + epoch).shuffle(items)
-        for start in range(0, len(items), MICRO_BATCH):
-            loss = loss_on(model, collate_items([items[start:start + MICRO_BATCH]], pad_id), sigma) / GRAD_ACCUM
+        rng = random.Random(seed + epoch)
+        batches = build_balanced_batches(items, MICRO_BATCH, rng)
+        for batch in batches:
+            loss = loss_on(model, collate_items([batch], pad_id), sigma) / GRAD_ACCUM
             loss.backward()
             step += 1
-            if step % GRAD_ACCUM == 0 or start + MICRO_BATCH >= len(items):
+            if step % GRAD_ACCUM == 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 opt.step(), sched.step(), opt.zero_grad(set_to_none=True)
             if step % 25 == 0:

@@ -118,10 +118,25 @@ def evaluate_model(model_path: str):
     print("=" * 60)
     print(f"EVALUATION RESULTS FOR: {model_path}")
     print(f"Evaluated {total} items in {elapsed:.2f}s ({total/elapsed:.1f} seq/s)")
-    print(f"Agreement (Accuracy): {agreement:.4f} ({correct}/{total})")
-    print(f"Recall (Sensitivity): {recall:.4f} ({true_positives}/{len(include_ids)})")
-    print(f"Precision:            {precision:.4f} ({true_positives}/{predicted_includes})")
-    print(f"Picks Distribution:   {counts}")
+    print(f"Agreement (Accuracy at P>=0.50): {agreement:.4f} ({correct}/{total})")
+    print(f"Recall (Sensitivity at P>=0.50): {recall:.4f} ({true_positives}/{len(include_ids)})")
+    print(f"Precision (at P>=0.50):          {precision:.4f} ({true_positives}/{predicted_includes})")
+    print(f"Picks Distribution (at P>=0.50): {counts}")
+    
+    print("\nOperating Threshold Sweep on P(include):")
+    print("Thresh | Pred_Inc | TP  | FP   | Recall  | Precision | F1")
+    print("-" * 55)
+    labels_arr = [1 if key[r["id"]] == "include" else 0 for r in rows]
+    probs_arr = [r["p_include"] for r in rows]
+    for t in [0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]:
+        t_pred = [1 if p >= t else 0 for p in probs_arr]
+        t_tp = sum(1 for p, y in zip(t_pred, labels_arr) if p == 1 and y == 1)
+        t_fp = sum(1 for p, y in zip(t_pred, labels_arr) if p == 1 and y == 0)
+        t_fn = sum(1 for p, y in zip(t_pred, labels_arr) if p == 0 and y == 1)
+        t_rec = t_tp / (t_tp + t_fn) if (t_tp + t_fn) > 0 else 0
+        t_prec = t_tp / (t_tp + t_fp) if (t_tp + t_fp) > 0 else 0
+        t_f1 = 2 * t_prec * t_rec / (t_prec + t_rec) if (t_prec + t_rec) > 0 else 0
+        print(f"{t:6.2f} | {sum(t_pred):8d} | {t_tp:3d} | {t_fp:4d} | {t_rec:7.4f} | {t_prec:9.4f} | {t_f1:.4f}")
     print("=" * 60)
 
     tag = "base" if model_path == "base" else Path(model_path).name
