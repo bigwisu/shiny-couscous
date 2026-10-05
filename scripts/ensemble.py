@@ -47,11 +47,12 @@ def load_scores(path: Path) -> dict[int, float]:
 def load_labels(jsonl_path: Path) -> dict[int, int]:
     """id -> 1 (include) / 0 (exclude) from a judged JSONL."""
     labels = {}
-    for line in jsonl_path.read_text().splitlines():
-        if not line.strip():
-            continue
-        r = json.loads(line)
-        labels[r["id"]] = 1 if r["planted"] == "none" else 0
+    with open(jsonl_path, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            labels[r["id"]] = 1 if r["planted"] == "none" else 0
     return labels
 
 
