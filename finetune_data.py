@@ -43,7 +43,9 @@ def labels(row: dict[str, Any], _reference: str = "planted") -> dict[str, str]:
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    # open() iterates on OS newlines only — safe when JSON strings contain \n escapes
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
 
 
 # v3: soft label constants — prevent logit saturation on true inclusions
