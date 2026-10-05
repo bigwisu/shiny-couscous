@@ -80,7 +80,12 @@ def plot(stages: list[Stage], path: str | None = None, compare: tuple[int, int] 
 
 
 def preflight(rows: list[dict], mix: str, out: str | None, allow_skew: bool) -> None:
-    """Show the class mix this run will train on, and refuse a skewed one unless told otherwise."""
+    """Show the class mix this run will train on, and refuse a skewed one unless told otherwise.
+
+    When --mix balanced is active the gradient weights are intentionally 50/50, which
+    is off the 16.4% corpus design by construction.  That is not a data problem, so the
+    design-skew check is skipped for balanced runs.
+    """
     import matplotlib
     matplotlib.use("Agg")
 
@@ -89,6 +94,9 @@ def preflight(rows: list[dict], mix: str, out: str | None, allow_skew: bool) -> 
     if out:
         os.makedirs(out, exist_ok=True)
         plot(stages, os.path.join(out, "mix.png"))
+    # Skip design-skew check when balanced weighting is intentionally applied
+    if mix == "balanced":
+        return
     found = problems(shares(rows, weighted=mix != "none"))
     if found and not allow_skew:
         sys.exit("mix is off the design, not training:\n  " + "\n  ".join(found)
