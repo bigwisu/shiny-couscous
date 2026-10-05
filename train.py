@@ -1,21 +1,25 @@
 """Fine-tune Laya on citation screening.
 
-    python train.py --train data/train_all.jsonl --out runs/soces-pubmed-v5
+    python train.py --train data/train_all.jsonl --out runs/soces-pubmed-v9
     python train.py --train data/train_all.jsonl --max-steps 25   # smoke-test
 
-v5 changes vs v4:
-  - loss_on: RLCD dropped entirely. CE-only with pos_weight=5× (back to v2 formula).
-  - train(): staged encoder unfreezing — head-only for FREEZE_EPOCHS, then full
-    fine-tune.  Prevents bimodal collapse seen in v4 where the encoder shifted into
-    exclusion mode before the head had calibrated to the class weights.
-  - train(): val monitoring kept (--val), but early-stop trigger removed.
-    CE loss is bounded, so automatic stopping is not needed.
+v9 changes vs v7:
+  - loss_on: pos_weight raised from 5x to 9x to push TPs trapped in the 0.01-0.10
+    band above the decision boundary.
+  - loss_on: asymmetric focal loss (gamma=2.0) applied to NEGATIVES only.  Suppresses
+    gradients from the large mass of easy negatives (62% of TNs score 0.01-0.10 in
+    v7) that crowd the decision boundary and prevent TP separation.
+    Positives keep the standard CE term (no focal dampening) so FN gradients remain
+    full-strength.
 
-Retained from v3/v4:
+Retained from v7/v5:
   - LR_ENCODER=8e-6, LR_HEAD=1e-4 with CosineAnnealingLR.
+  - Staged encoder unfreezing: head-only for FREEZE_EPOCHS=2, then full fine-tune.
   - Soft inclusion targets [0.90, 0.10] in finetune_data.py.
   - Hard-negative mining: 1 pos + 1 hard-neg + 2 easy-neg per batch.
+  - PICO-structured inputs from format_pico.py (train on PICO-formatted JSONL).
   - Isotonic margin calibration T<=2.5 in calibrate.py.
+  - Val monitoring (--val), no early-stop.
 """
 
 import argparse
@@ -65,25 +69,44 @@ def forward(model, batch):
     return logits.float(), act
 
 
+# v9: asymmetric focal loss gamma applied to negatives only
+FOCAL_GAMMA = 2.0
+
+
 def loss_on(model, batch, _sigma: float = 0.0):
-    """v5: CE-only with 5× false-negative penalty.
+    """v9: CE with 9x FN penalty + asymmetric focal dampening on negatives.
 
-    RLCD is dropped entirely.  The reinforcement signal had high variance at 16%
-    positive rate — every weight tried (1×, 3×, 10×) either left recall unchanged
-    or destabilised training.  CE with pos_weight=5× is the v2 formula that gave
-    the best F1 (0.3440) of any run.
+    Two changes from v7 (which used pos_weight=5x, no focal):
 
-    pos_weight = 5× applies only to true inclusions (target[:, 0] > 0.5).
-    Soft labels [0.90, 0.10] from finetune_data.py mean the inclusion slot is 0.90,
-    so the > 0.5 threshold still fires correctly.
+    1. pos_weight raised to 9x -- pushes TPs that were trapped in the 0.01-0.10 band
+       (27% of all TPs in v7) above the decision boundary.
+
+    2. Asymmetric focal loss on negatives only (gamma=2.0):
+         loss_neg_i = p_hat_i^gamma * CE_neg_i
+       where p_hat_i is the model's include-probability for item i.
+       Easy negatives (p_hat ~0.05) are dampened by 0.05^2 ~0.0025.
+       Hard borderline negatives (p_hat ~0.30) keep 9% of their gradient.
+       Positives are NOT dampened -- full CE gradient preserved for FN recovery.
+
+    Soft labels [0.90, 0.10] from finetune_data.py: inclusion slot = 0.90,
+    so `target[:, 0] > 0.5` correctly identifies include rows.
     """
     logits, act = forward(model, batch)
     mask, target = batch["marker_mask"].to(DEVICE), batch["target"].to(DEVICE)
 
-    is_include = (target[:, 0] > 0.5).float()
-    pos_weight  = 1.0 + 4.0 * is_include   # 5.0 for includes, 1.0 for excludes
+    is_include  = (target[:, 0] > 0.5).float()           # 1 for include, 0 for exclude
+    pos_weight  = 1.0 + 8.0 * is_include                 # 9.0 for includes, 1.0 for excludes
 
-    ce = -(target * torch.log_softmax(logits.masked_fill(~mask, -1e4), -1)).sum(-1) * pos_weight
+    log_probs   = torch.log_softmax(logits.masked_fill(~mask, -1e4), -1)
+    ce_per_item = -(target * log_probs).sum(-1)           # scalar CE per sequence
+
+    # focal dampening: (p_include)^gamma for negatives; 1.0 for positives
+    p_include   = log_probs[:, 0].exp().detach()          # detach so scale doesn't shift logits
+    focal_scale = torch.where(is_include.bool(),
+                              torch.ones_like(p_include),
+                              p_include ** FOCAL_GAMMA)
+
+    ce = ce_per_item * focal_scale * pos_weight
     w  = torch.tensor([m["weight"] for m in batch["meta"]], device=DEVICE)
     return (ce * w).sum() / w.sum() + 0.0 * act.sum()
 
