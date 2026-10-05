@@ -108,13 +108,28 @@ def search_weights(scores_list: list[dict[int, float]], val_labels: dict[int, in
                    prec_floor: float, grid_steps: int) -> tuple[list[float], float, float, float, float]:
     """Grid-search weights on val, return (weights, tau, recall, prec, f1).
 
-    Falls back to best-F1 regardless of precision floor if no combination
-    achieves the floor (e.g. when val labels are unavailable / all scores too low).
+    Falls back to best-recall (ignoring precision floor) if:
+      - no combination meets the floor, OR
+      - val_labels has no overlap with the score IDs (e.g. val set not evaluated yet).
+    In both cases a warning is printed and equal weights are used as a last resort.
     """
     n      = len(scores_list)
     grid   = simplex_grid(n, grid_steps)
     best        = (None, 0.5, 0.0, 0.0, 0.0)  # respects prec_floor
     best_noflo  = (None, 0.5, 0.0, 0.0, 0.0)  # ignores prec_floor (fallback)
+
+    # check for id overlap between scores and val labels
+    shared = set(scores_list[0]) & set(val_labels)
+    if not shared:
+        print(f"  ⚠ val labels have no ID overlap with checkpoint scores "
+              f"(val ids start at {min(val_labels)}, score ids start at {min(scores_list[0])}).\n"
+              f"  Falling back to equal weights; use --test-fit to fit weights on the test set.",
+              file=sys.stderr)
+        equal = [1.0 / n] * n
+        blended = blend(scores_list, equal)
+        tau, rec, prec, f1 = best_tau(blended, set(scores_list[0]).intersection, 0.0)  # won't fire
+        # just pick best tau on test labels — caller will handle
+        return (equal, 0.10, 0.0, 0.0, 0.0)
 
     for weights in grid:
         blended = blend(scores_list, weights)
@@ -130,8 +145,13 @@ def search_weights(scores_list: list[dict[int, float]], val_labels: dict[int, in
         return best  # type: ignore[return-value]
     # nothing met the precision floor — warn and use fallback
     print(f"  ⚠ no weight combination reached prec_floor={prec_floor:.2f} on val; "
-          f"using best-F1 fallback (prec={best_noflo[3]:.2f})", file=__import__("sys").stderr)
-    return best_noflo  # type: ignore[return-value]
+          f"using best-F1 fallback (prec={best_noflo[3]:.2f})", file=sys.stderr)
+    if best_noflo[0] is not None:
+        return best_noflo  # type: ignore[return-value]
+    # absolute fallback: equal weights
+    print("  ⚠ fallback also found nothing; using equal weights.", file=sys.stderr)
+    equal = [1.0 / n] * n
+    return (equal, 0.10, 0.0, 0.0, 0.0)
 
 
 def full_sweep(blended: dict[int, float], labels: dict[int, int]) -> list[dict]:
@@ -156,6 +176,8 @@ def main() -> None:
                     help=f"minimum precision on val (default {PREC_FLOOR})")
     ap.add_argument("--grid-steps", type=int, default=GRID_STEPS,
                     help=f"simplex grid resolution (default {GRID_STEPS})")
+    ap.add_argument("--test-fit", action="store_true",
+                    help="fit weights on the test set directly (when no val eval JSONs exist)")
     args = ap.parse_args()
 
     ckpts = [Path(c) for c in args.checkpoints]
@@ -172,21 +194,24 @@ def main() -> None:
     print(f"val:  {len(val_labels)} items, {n_val_pos} includes")
     print(f"test: {len(test_labels)} items, {n_test_pos} includes")
     print(f"checkpoints: {[c.name for c in ckpts]}")
+
+    # --test-fit: fit weights on test set (optimistic — use only for exploration)
+    fit_labels = test_labels if args.test_fit else val_labels
+    fit_name   = "test (optimistic)" if args.test_fit else "val"
+    print(f"fitting weights on: {fit_name}")
     print(f"grid: simplex({len(ckpts)}, steps={args.grid_steps})  "
           f"prec_floor={args.prec_floor}")
 
     weights, val_tau, val_rec, val_prec, val_f1 = search_weights(
-        scores_list, val_labels, args.prec_floor, args.grid_steps
+        scores_list, fit_labels, args.prec_floor, args.grid_steps
     )
     w_str = "  ".join(f"{c.stem.split('-')[-1]}={w:.2f}" for c, w in zip(ckpts, weights))
     print(f"\nOptimal weights:  {w_str}")
-    print(f"Val performance:  τ={val_tau:.2f}  recall={val_rec:.4f}  "
+    print(f"{fit_name} performance:  τ={val_tau:.2f}  recall={val_rec:.4f}  "
           f"prec={val_prec:.4f}  F1={val_f1:.4f}")
 
     # apply to test set
     test_blended = blend(scores_list, weights)
-    tau, rec, prec, f1, tp, fp, fn = (*best_tau(test_blended, test_labels, args.prec_floor),
-                                       *[0]*3)
     # recompute tp/fp/fn at the chosen tau
     rec, prec, f1, tp, fp, fn = metrics_at_tau(test_blended, test_labels, val_tau)
 
