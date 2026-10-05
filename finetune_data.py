@@ -76,5 +76,6 @@ def to_items(rows: list[dict[str, Any]], qs: dict[str, dict[str, Any]], tok, cfg
             else:           # exclude → hard target (already correct; keep gradient sharp)
                 target = [1.0 if i == label else 0.0 for i in range(len(keys))]
             items.append({"ids": ids, "markers": markers, "qtype": QTYPES[q["type"]], "target": target,
-                          "label": label, "question": name, "weight": row.get("weight", 1.0)})
+                          "label": label, "question": name, "weight": row.get("weight", 1.0),
+                          "bge_sim": row.get("bge_sim", 0.0)})
     return items
