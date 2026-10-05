@@ -1,0 +1,156 @@
+{
+  "22986378": {
+    "population": "Patients hospitalized for acute stroke or myocardial infarction",
+    "intervention": "Transitional care interventions",
+    "outcome": "Benefits or harms, including rehospitalization and adverse outcomes",
+    "study_design": "English-language trials",
+    "date_range": "January 2000 to March 2012"
+  },
+  "23529983": {
+    "population": "People with type 2 diabetes",
+    "intervention": "Baseline coronary artery calcium score",
+    "outcome": "All-cause mortality and cardiovascular events",
+    "study_design": "Prospective observational studies",
+    "date_range": null
+  },
+  "23814120": {
+    "population": "Participants at risk of breast cancer",
+    "intervention": "Fish intake, n-3 PUFA intake, or tissue biomarkers",
+    "outcome": "Breast cancer risk and dose-response relationship",
+    "study_design": "Prospective cohort studies",
+    "date_range": "Through December 2012"
+  },
+  "23935058": {
+    "population": "Known child sexual abusers and individuals at risk of sexually abusing children",
+    "intervention": "Medical and psychological interventions to prevent reoffending or first-time abuse",
+    "outcome": "Arrests, convictions, breaches of conditions, and self-reported child sexual abuse after at least one year",
+    "study_design": "Randomised controlled trials and prospective observational studies",
+    "date_range": null
+  },
+  "24046285": {
+    "population": "Smokers and nonsmokers in randomized trial subgroups",
+    "intervention": "Clopidogrel, prasugrel, or ticagrelor",
+    "outcome": "Antiplatelet efficacy in preventing cardiovascular events",
+    "study_design": "Randomized trials reporting clinical outcomes by smoking status",
+    "date_range": "1966 to present"
+  },
+  "24727842": {
+    "population": "Patients undergoing transcatheter aortic valve replacement",
+    "intervention": "Transcatheter aortic valve replacement",
+    "outcome": "Change in functional status and quality of life",
+    "study_design": "Studies reporting eligible functional or quality-of-life measures",
+    "date_range": "1 January 2002 to 30 September 2013"
+  },
+  "25059938": {
+    "population": "Sex workers in low- and middle-income countries",
+    "intervention": "Community empowerment-based approaches addressing HIV",
+    "outcome": "Effectiveness for HIV outcomes",
+    "study_design": "Not specified",
+    "date_range": null
+  },
+  "25770113": {
+    "population": "Adults with psoriatic arthritis, psoriasis, or inflammatory bowel disease",
+    "intervention": "Methotrexate versus placebo or active comparator",
+    "outcome": "Relative risk of pulmonary disease",
+    "study_design": "Double-blind randomized controlled trials with at least 50 participants and 12 weeks' duration",
+    "date_range": "Through 9 January 2014"
+  },
+  "26199070": {
+    "population": "Adults without diabetes",
+    "intervention": "Consumption of sugar-sweetened beverages, artificially sweetened beverages, and fruit juice",
+    "outcome": "Type 2 diabetes risk and population attributable fraction",
+    "study_design": "Prospective studies",
+    "date_range": "Studies published through February 2014"
+  },
+  "26349907": {
+    "population": "Patients with suspected acute pulmonary embolism in primary care",
+    "intervention": "Diagnostic prediction models for ruling out pulmonary embolism",
+    "outcome": "Discriminative ability (C statistics) and model transportability",
+    "study_design": "Independent external validation study",
+    "date_range": null
+  },
+  "26830055": {
+    "population": "Patients undergoing diagnostic or therapeutic imaging",
+    "intervention": "Low-osmolar or iso-osmolar contrast media",
+    "outcome": "Contrast-induced nephropathy risk",
+    "study_design": "Randomized controlled trials",
+    "date_range": "Through June 2015"
+  },
+  "26868137": {
+    "population": "People with diabetes mellitus",
+    "intervention": "RAS blockers compared with other antihypertensive agents",
+    "outcome": "Death, cardiovascular and renal outcomes, and cardiovascular events",
+    "study_design": "Randomized controlled trials",
+    "date_range": null
+  },
+  "26903336": {
+    "population": "Adults with infection or septic shock",
+    "intervention": "Revised septic shock definition and clinical criteria",
+    "outcome": "Identification of septic shock",
+    "study_design": "Task-force consensus informed by observational studies and meta-analysis",
+    "date_range": null
+  },
+  "27737830": {
+    "population": "Humans receiving standard childhood immunisations",
+    "intervention": "BCG, measles, diphtheria, pertussis, and tetanus vaccines",
+    "outcome": "Non-specific immunological effects after vaccination",
+    "study_design": "Randomised controlled trials, cohort studies, and case-control studies",
+    "date_range": "1947 to January 2014"
+  },
+  "30158148": {
+    "population": "People studied in epidemiological studies",
+    "intervention": "Exposure to arsenic, lead, cadmium, mercury, or copper",
+    "outcome": "Risk of total cardiovascular disease, coronary heart disease, or stroke",
+    "study_design": "Epidemiological studies reporting risk estimates",
+    "date_range": "Searches conducted up to December 2017"
+  },
+  "30617123": {
+    "population": "Patients with acute Achilles tendon rupture",
+    "intervention": "Operative versus nonoperative treatment; weight-bearing and functional rehabilitation strategies",
+    "outcome": "Re-rupture, complications, and functional outcomes",
+    "study_design": "Randomised controlled trials and observational studies",
+    "date_range": "Searches through 25 April 2018"
+  },
+  "30917990": {
+    "population": "Adults with acute major depressive episodes",
+    "intervention": "Non-surgical brain stimulation",
+    "outcome": "Comparative clinical efficacy and acceptability",
+    "study_design": "Randomized clinical trials",
+    "date_range": "Through 8 May 2018"
+  },
+  "31255301": {
+    "population": "General population assessed before and after HPV vaccination",
+    "intervention": "Population-level HPV vaccination",
+    "outcome": "HPV infections, anogenital warts, or histologically confirmed CIN2+",
+    "study_design": "Comparative pre-vaccination and post-vaccination population studies",
+    "date_range": "Feb 1, 2014–Oct 11, 2018"
+  },
+  "31585960": {
+    "population": "Patients with chronic obstructive pulmonary disease (COPD)",
+    "intervention": "Prognostic models developed, validated, or updated",
+    "outcome": "Any potential clinical outcome",
+    "study_design": "Prediction-model development, validation, or updating studies",
+    "date_range": "Through November 2018"
+  },
+  "31990319": {
+    "population": "Clinicians and health care settings",
+    "intervention": "Malpractice liability risk",
+    "outcome": "Health care quality and safety",
+    "study_design": "Empirical studies; design unspecified",
+    "date_range": "Beginning in January; year and end date not stated"
+  },
+  "32909814": {
+    "population": "Adults with hypertension or elevated blood pressure",
+    "intervention": "More intensive pharmacologic blood pressure lowering",
+    "outcome": "Orthostatic hypotension",
+    "study_design": "Randomized trials with over 500 participants and at least 6 months’ duration",
+    "date_range": "Inception through 7 October 2019"
+  },
+  "33472813": {
+    "population": "People with back pain or osteoarthritis pain",
+    "intervention": "Antidepressant drugs versus placebo",
+    "outcome": "Efficacy and safety",
+    "study_design": "Randomised controlled trials",
+    "date_range": "Database inception to 12 May 2020"
+  }
+}
