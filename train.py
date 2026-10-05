@@ -49,7 +49,7 @@ def forward(model, batch):
 
 
 def loss_on(model, batch, sigma: float):
-    """RLCD: sample noisy distributions, reward with a proper score, push toward the better ones."""
+    """RLCD with asymmetric false-negative penalty (5.0x for positive includes)."""
     logits, act = forward(model, batch)
     mask, target = batch["marker_mask"].to(DEVICE), batch["target"].to(DEVICE)
     k = mask.sum(-1, keepdim=True).float()
@@ -61,7 +61,12 @@ def loss_on(model, batch, sigma: float):
         r = proper_reward(q, target.unsqueeze(0), batch["qtype"].to(DEVICE), mask, w_sph=0.75, w_rps=1.0)
         adv = (r - r.mean(0, keepdim=True)) / ((r - r.mean(0, keepdim=True)).std() + 1e-6)
     logp = -(((z - logits.unsqueeze(0)) ** 2) * mask).sum(-1) / (2 * sigma**2)
-    ce = -(target * torch.log_softmax(logits.masked_fill(~mask, -1e4), -1)).sum(-1)
+    
+    # Asymmetric class penalty: target[:, 0] is 'include' (label 0 in SCREENING_OPTIONS)
+    # Weight includes 5.0x to prevent majority-class collapse
+    pos_weight = torch.where(target[:, 0] == 1.0, 5.0, 1.0).to(DEVICE)
+    ce = -(target * torch.log_softmax(logits.masked_fill(~mask, -1e4), -1)).sum(-1) * pos_weight
+    
     w = torch.tensor([m["weight"] for m in batch["meta"]], device=DEVICE)
     loss_rl = -((adv * logp).mean(0) * w).sum() / w.sum()
     return loss_rl + (ce * w).sum() / w.sum() + 0.0 * act.sum()

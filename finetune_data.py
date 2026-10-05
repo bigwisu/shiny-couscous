@@ -13,10 +13,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from huggingface_hub import snapshot_download
-from laya.agent import _fix_tokenizer_config
-from laya.common import QTYPES, build_sequence, render_options
-
 from judge_task import laya_questions
 
 MODEL_ID, SUBFOLDER = "convaiinnovations/laya", "typed-decisions"
@@ -29,9 +25,9 @@ TEST_SET = Path(__file__).parent / "data" / "test_judged.jsonl"
 
 def base_checkpoint() -> str:
     """Local path of the zero-shot checkpoint every result is compared against."""
+    from huggingface_hub import snapshot_download
     root = snapshot_download(MODEL_ID, allow_patterns=[f"{SUBFOLDER}/*"])
     path = os.path.join(root, SUBFOLDER)
-    _fix_tokenizer_config(path)
     return path
 
 
@@ -53,6 +49,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 def to_items(rows: list[dict[str, Any]], qs: dict[str, dict[str, Any]], tok, cfg,
              _reference: str = "planted") -> list[dict[str, Any]]:
     """One training sequence per row, dropping any whose markers were cut."""
+    from laya.common import QTYPES, build_sequence, render_options
     items = []
     for row in rows:
         state = {"QUESTION": row["question"], "ANSWER": row["answer"]}

@@ -7,21 +7,20 @@ One binary question: given a systematic-review objective (QUESTION) and a candid
 from typing import Any
 
 SCREENING_OPTIONS: dict[str, str] = {
-    "include": "the abstract meets the review's inclusion criteria and should be retrieved for full-text screening",
-    "exclude": "the abstract does not meet the inclusion criteria and should be discarded",
+    "include": "the paper reports empirical data on the topic or population described in the review objective, even indirectly",
+    "exclude": "the paper's topic is entirely unrelated to the review objective, or it contains no data (e.g. editorial, commentary, opinion piece)",
 }
 
 
 def laya_questions() -> dict[str, dict[str, Any]]:
-    """The screening question in Laya's schema."""
+    """The screening question in Laya's schema, aligned with the V7 rubric."""
     return {
         "verdict": {
             "type": "choice",
             "instructions": (
-                "You are screening citations for a systematic review. "
-                "Read the review QUESTION (objective and inclusion criteria) "
-                "and the candidate ANSWER (title + abstract). "
-                "Decide whether this paper should be included for full-text review."
+                "Given the systematic review objective in QUESTION, does this paper in ANSWER contribute relevant evidence — even indirectly? "
+                "Include if the paper reports empirical data on the topic or population described in the review objective, regardless of whether its study design or subpopulation exactly matches the review's primary methodology. "
+                "Exclude if the paper's topic is entirely unrelated to the review objective, or it contains no data."
             ),
             "criteria": SCREENING_OPTIONS,
         }
