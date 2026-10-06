@@ -1,9 +1,11 @@
 """Fast PyTorch-based GPU evaluation on Linux / CUDA cloud instances.
 
-Runs batched inference across the test set in ~15-20 seconds on GPU.
+Runs batched inference across any judged JSONL in ~15-20 seconds on GPU.
 
-    python evaluate_torch.py runs/soces-pubmed
+    python evaluate_torch.py runs/soces-pubmed-v10
     python evaluate_torch.py base
+    python evaluate_torch.py runs/soces-pubmed-v10 --val data/val.jsonl \
+        --out runs/eval_val_soces-pubmed-v10.json
 """
 
 import collections
@@ -45,7 +47,7 @@ def load_checkpoint(model_dir: str):
 
 
 @torch.no_grad()
-def evaluate_model(model_path: str):
+def evaluate_model(model_path: str, out_override: Path | None = None):
     model, cfg, tok = load_checkpoint(model_path)
     items = read_jsonl(TEST_SET)
     qs = questions()
@@ -141,7 +143,8 @@ def evaluate_model(model_path: str):
 
     tag = "base" if model_path == "base" else Path(model_path).name
     RUNS.mkdir(exist_ok=True)
-    out_file = RUNS / f"eval_torch_{tag}.json"
+    out_file = out_override if out_override else RUNS / f"eval_torch_{tag}.json"
+    out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(json.dumps({
         "agreement": round(agreement, 4),
         "recall": round(recall, 4),
@@ -153,5 +156,14 @@ def evaluate_model(model_path: str):
 
 
 if __name__ == "__main__":
-    model_arg = sys.argv[1] if len(sys.argv) > 1 else "runs/soces-pubmed"
-    evaluate_model(model_arg)
+    import argparse as _ap
+    _p = _ap.ArgumentParser()
+    _p.add_argument("model", nargs="?", default="runs/soces-pubmed")
+    _p.add_argument("--val",  default=None,
+                    help="evaluate on this judged JSONL instead of the default test set")
+    _p.add_argument("--out",  default=None,
+                    help="write results to this path instead of the default runs/ location")
+    _args = _p.parse_args()
+    if _args.val:
+        TEST_SET = Path(_args.val)
+    evaluate_model(_args.model, out_override=Path(_args.out) if _args.out else None)
