@@ -1,18 +1,19 @@
 """Fine-tune Laya on citation screening.
 
-    python train.py --train data/train_all.jsonl --out runs/soces-pubmed-v9
+    python train.py --train data/train_all.jsonl --out runs/soces-pubmed-v10
     python train.py --train data/train_all.jsonl --max-steps 25   # smoke-test
 
-v9 changes vs v7:
-  - loss_on: pos_weight raised from 5x to 9x to push TPs trapped in the 0.01-0.10
-    band above the decision boundary.
-  - loss_on: asymmetric focal loss (gamma=2.0) applied to NEGATIVES only.  Suppresses
-    gradients from the large mass of easy negatives (62% of TNs score 0.01-0.10 in
-    v7) that crowd the decision boundary and prevent TP separation.
-    Positives keep the standard CE term (no focal dampening) so FN gradients remain
-    full-strength.
+v10 changes vs v9:
+  - loss_on: pos_weight reduced from 9x to 7x.  v9's 9x overcorrected — exclusion
+    gradient was overwhelmed, pushing the entire test set above tau=0.10 (same
+    failure mode as v3).  7x keeps the FN penalty meaningful without eliminating
+    the exclusion signal.
+  - loss_on: focal gamma reduced from 2.0 to 1.0.  At gamma=2.0 easy negatives
+    (p_hat~0.05) were dampened to 0.0025 of their gradient — effectively zero.
+    At gamma=1.0 they retain 5% of gradient, sufficient to maintain the exclusion
+    boundary without letting easy negatives dominate.
 
-Retained from v7/v5:
+Retained from v9/v7/v5:
   - LR_ENCODER=8e-6, LR_HEAD=1e-4 with CosineAnnealingLR.
   - Staged encoder unfreezing: head-only for FREEZE_EPOCHS=2, then full fine-tune.
   - Soft inclusion targets [0.90, 0.10] in finetune_data.py.
@@ -69,24 +70,26 @@ def forward(model, batch):
     return logits.float(), act
 
 
-# v9: asymmetric focal loss gamma applied to negatives only
-FOCAL_GAMMA = 2.0
+# v10: halved focal gamma vs v9 — retains enough exclusion gradient to prevent
+# the over-inclusive collapse seen when gamma=2.0 zeroed easy-negative gradients.
+FOCAL_GAMMA = 1.0
 
 
 def loss_on(model, batch, _sigma: float = 0.0):
-    """v9: CE with 9x FN penalty + asymmetric focal dampening on negatives.
+    """v10: CE with 7x FN penalty + asymmetric focal dampening on negatives (gamma=1.0).
 
-    Two changes from v7 (which used pos_weight=5x, no focal):
+    Two changes from v9 (pos_weight=9x, gamma=2.0), which overcorrected:
 
-    1. pos_weight raised to 9x -- pushes TPs that were trapped in the 0.01-0.10 band
-       (27% of all TPs in v7) above the decision boundary.
+    1. pos_weight reduced to 7x: v9's 9x overwhelmed the exclusion gradient, pushing
+       the entire test set above tau=0.10.  7x is between v7 (5x, too weak) and v9
+       (9x, too strong).
 
-    2. Asymmetric focal loss on negatives only (gamma=2.0):
-         loss_neg_i = p_hat_i^gamma * CE_neg_i
-       where p_hat_i is the model's include-probability for item i.
-       Easy negatives (p_hat ~0.05) are dampened by 0.05^2 ~0.0025.
-       Hard borderline negatives (p_hat ~0.30) keep 9% of their gradient.
-       Positives are NOT dampened -- full CE gradient preserved for FN recovery.
+    2. Focal gamma reduced to 1.0: at gamma=2.0 easy negatives (p_hat~0.05) had
+       0.05^2=0.0025 of gradient — effectively zero.  At gamma=1.0 they retain
+       p_hat^1=0.05 (5%) — enough to maintain the exclusion boundary.
+
+    Asymmetric: focal dampening is applied to NEGATIVES only.  Positives keep
+    full CE gradient so FN recovery is unimpeded.
 
     Soft labels [0.90, 0.10] from finetune_data.py: inclusion slot = 0.90,
     so `target[:, 0] > 0.5` correctly identifies include rows.
@@ -95,7 +98,7 @@ def loss_on(model, batch, _sigma: float = 0.0):
     mask, target = batch["marker_mask"].to(DEVICE), batch["target"].to(DEVICE)
 
     is_include  = (target[:, 0] > 0.5).float()           # 1 for include, 0 for exclude
-    pos_weight  = 1.0 + 8.0 * is_include                 # 9.0 for includes, 1.0 for excludes
+    pos_weight  = 1.0 + 6.0 * is_include                 # 7.0 for includes, 1.0 for excludes
 
     log_probs   = torch.log_softmax(logits.masked_fill(~mask, -1e4), -1)
     ce_per_item = -(target * log_probs).sum(-1)           # scalar CE per sequence
