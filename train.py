@@ -56,9 +56,14 @@ HARD_NEG_THRESHOLD = 0.05
 VAL_RECALL_THRESHOLD = 0.30
 
 
-def load_model(model_dir: str):
+def load_model(model_dir: str, encoder_override: str | None = None):
     cfg = json.load(open(os.path.join(model_dir, "rl_agent_config.json")))
-    model = build_model(cfg, encoder_dir=os.path.join(model_dir, "encoder"))
+    if encoder_override:
+        cfg["encoder"] = encoder_override
+        enc_dir = None          # force build_model to download backbone from HF
+    else:
+        enc_dir = os.path.join(model_dir, "encoder")
+    model = build_model(cfg, encoder_dir=enc_dir)
     model.load_state_dict(load_file(os.path.join(model_dir, "model.safetensors")), strict=True)
     return model.to(DEVICE), cfg, AutoTokenizer.from_pretrained(os.path.join(model_dir, "tokenizer"))
 
@@ -262,6 +267,9 @@ def main() -> None:
     ap.add_argument("--seed",  type=int, default=SEED)
     ap.add_argument("--epochs", type=int, default=6)
     ap.add_argument("--max-steps", type=int, default=None)
+    ap.add_argument("--encoder", default=None,
+                    help="HF model ID to use as the encoder backbone instead of the one "
+                         "baked into the base checkpoint, e.g. thomas-sounack/BioClinical-ModernBERT-large")
     ap.add_argument("--out",   default=None,
                     help="output directory, e.g. runs/soces-pubmed-v5")
     args = ap.parse_args()
@@ -273,7 +281,7 @@ def main() -> None:
     preflight(rows, args.mix, args.out, args.allow_skew)
 
     torch.manual_seed(args.seed)
-    model, cfg, tok = load_model(base_checkpoint())
+    model, cfg, tok = load_model(base_checkpoint(), encoder_override=args.encoder)
     qs = questions()
 
     n_calib     = int(len(rows) * CALIB_SHARE)
